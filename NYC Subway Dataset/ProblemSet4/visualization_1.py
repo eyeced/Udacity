@@ -1,7 +1,6 @@
 from pandas import *
 from ggplot import *
 import numpy as np
-from dateutil.parser import parse
 
 def plot_weather_data(turnstile_weather):
     '''
