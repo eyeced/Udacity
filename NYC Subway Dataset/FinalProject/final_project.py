@@ -46,25 +46,27 @@ def compute_r_squared(data, predictions):
 def plot_weather_data(turnstile_weather):
     
     pandas.options.mode.chained_assignment = None
-
-    df = turnstile_weather[['UNIT', 'Hour', 'ENTRIESn_hourly']]
-    df['Num'] = df['UNIT'].apply(lambda s: int(s[1:]))
+    df = turnstile_weather[['DATEn', 'ENTRIESn_hourly']]    
     
-    grouped = df.groupby('Hour')
-    df1 = grouped.agg({'ENTRIESn_hourly' : np.sum}).reset_index()
-    plot = ggplot(df1, aes('Hour', 'ENTRIESn_hourly')) + geom_histogram(stat='bar') + ggtitle('Ridership By Hour')
+    df['Day'] = df['DATEn'].apply(lambda d: parse(d).weekday())
+    uni_days = df['Day'].drop_duplicates()
+    
+    df1 = pandas.DataFrame({'DATEn' : uni_days, 'ENTRIESn_hourly' : uni_days.apply(lambda unit: np.sum(df['ENTRIESn_hourly'][df['Day'] == unit]))})
+    # print(df1)
+    plot = ggplot(df1, aes('DATEn', 'ENTRIESn_hourly')) + geom_histogram(stat='bar') + ggtitle('Ridership By Day')
     return plot
 
 def plot_weather_data_2(turnstile_weather):
     
     pandas.options.mode.chained_assignment = None
-    df = turnstile_weather[['UNIT', 'ENTRIESn_hourly', 'rain']]
+    df = turnstile_weather[['UNIT', 'ENTRIESn_hourly', 'rain']][turnstile_weather['rain'] == 0]
     df['Num'] = df['UNIT'].apply(lambda s: int(s[1:]))
     
     grouped = df.groupby(['Num', 'rain'])
-    df1 = grouped.agg({'ENTRIESn_hourly' : np.sum}).reset_index()
+    df1 = grouped.agg({'ENTRIESn_hourly' : np.mean}).reset_index()
+    df2 = df1[df1['ENTRIESn_hourly'] < 4000].reset_index()
     
-    plot = ggplot(df1, aes('Num', 'ENTRIESn_hourly', color = 'rain')) + geom_point() + geom_line() + ggtitle('Ridership Wihout Rain vs With Rain')
+    plot = ggplot(df2, aes(x='Num', y='ENTRIESn_hourly')) + geom_histogram(stat="bar", alpha=0.9, colour="#000099") + ggtitle('Ridership Without Rain')
     
     # plot = # your code here
     return plot

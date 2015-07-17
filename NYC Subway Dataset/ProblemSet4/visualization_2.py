@@ -36,13 +36,14 @@ def plot_weather_data(turnstile_weather):
     subset, about 1/3 of the actual data in the turnstile_weather dataframe.
     '''
     pandas.options.mode.chained_assignment = None
-    df = turnstile_weather[['UNIT', 'ENTRIESn_hourly', 'rain']]
-    df['Num'] = df['UNIT'].apply(lambda s: int(s[1:]))
+    df = turnstile_weather[['DATEn', 'ENTRIESn_hourly']]    
     
-    grouped = df.groupby(['Num', 'rain'])
-    df1 = grouped.agg({'ENTRIESn_hourly' : np.sum}).reset_index()
+    df['Day'] = df['DATEn'].apply(lambda d: parse(d).weekday())
+    uni_days = df['Day'].drop_duplicates()
     
-    plot = ggplot(df1, aes('Num', 'ENTRIESn_hourly', color = 'rain')) + geom_point() + geom_line() + ggtitle('Ridership Wihout Rain vs With Rain')
-    
+    df1 = pandas.DataFrame({'DATEn' : uni_days, 'ENTRIESn_hourly' : uni_days.apply(lambda unit: np.sum(df['ENTRIESn_hourly'][df['Day'] == unit]))})
+    # print(df1)
+    plot = ggplot(df1, aes('DATEn', 'ENTRIESn_hourly')) + geom_histogram(stat='bar') + ggtitle('Ridership By Day')
+    return plot
     # plot = # your code here
     return plot
