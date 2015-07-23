@@ -59,21 +59,25 @@ def plot_weather_data(turnstile_weather):
 def plot_weather_data_2(turnstile_weather):
     
     pandas.options.mode.chained_assignment = None
-    df = turnstile_weather[['UNIT', 'ENTRIESn_hourly', 'rain']][turnstile_weather['rain'] == 0]
+    df = turnstile_weather[['UNIT', 'ENTRIESn_hourly', 'rain']]
     df['Num'] = df['UNIT'].apply(lambda s: int(s[1:]))
     
     grouped = df.groupby(['Num', 'rain'])
     df1 = grouped.agg({'ENTRIESn_hourly' : np.mean}).reset_index()
-    df2 = df1[df1['ENTRIESn_hourly'] < 4000].reset_index()
+    bins = np.arange(0, np.max(df1['ENTRIESn_hourly']), 150)
+    df1['int'] = np.digitize(df1['ENTRIESn_hourly'], bins)
     
-    plot = ggplot(df2, aes(x='Num', y='ENTRIESn_hourly')) + geom_histogram(stat="bar", alpha=0.9, colour="#000099") + ggtitle('Ridership Without Rain')
-    
-    # plot = # your code here
-    return plot
+    pyplot.hist(df1['ENTRIESn_hourly'][df1['rain'] == 0].values, bins, alpha=0.5, label='no rain', histtype='bar')
+    pyplot.hist(df1['ENTRIESn_hourly'][df1['rain'] == 1].values, bins, alpha=0.5, label='rain', histtype='bar')
+    pyplot.legend(loc = 'upper right')
+    pyplot.title('rainy vs non rainy days')
+    pyplot.xlabel('Volume of ridership')
+    pyplot.ylabel('Frequency')
+    pyplot.show()
     
 df = pd.read_csv("turnstile_weather.csv")
 pred = predictions(df)
 r_2 = compute_r_squared(pd.Series(df['ENTRIESn_hourly'].values), pred)
 print(r_2)
-plot_weather_data(df)
+print(plot_weather_data(df))
 plot_weather_data_2(df)
