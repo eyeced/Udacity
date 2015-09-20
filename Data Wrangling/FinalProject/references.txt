@@ -1,0 +1,5 @@
+Mongo References -
+https://docs.mongodb.org/manual/core/aggregation-pipeline/
+
+This one was quite extensive and was suffice in all the queries I wanted to explore in mongo.
+
