@@ -3,7 +3,7 @@ OpenStreetMap Project Data Wrangling with MongoDB
 _Abhinav Solan_
 ---------------
 
-Map Area: [San Francisco Bay Area, United States](https://s3.amazonaws.com/metro-extracts.mapzen.com/san-francisco-bay_california.osm.bz2)
+Map Area: [San Francisco, United States](http://www.openstreetmap.org/export#map=15/37.7650/-122.4435)
 
 ## 1. Problems Encountered in the Map
 * Format of Phone numbers is not consistent overall the data, some are like +1 xxx xxxxxxx while some are (xxx) xxx xxxx
@@ -41,40 +41,39 @@ This section contains the basic statistics about the dataset and MongoDB queries
 
 ### File Sizes
 
-* san-francisco-bay_california.osm ........... 1946 mb
-* san-francisco-bay_cali_reduced.osm ......... 396 mb
-* san-francisco-bay_cali_reduced.osm.json .... 446 mb
+* san_fran.osm ........... 74 mb
+* san_fran.osm.json .... 83 mb
 
 ### Data Analysis
 #### # Number of documents
 ```sh
 > db.find().count()
-2085162
+393461
 ```
 
 #### # Number of nodes
 ```sh
 > db.find({"type":"node"}).count()
-1901446
+358259
 ```
 
 #### # Number of ways
 ```sh
 > db.find({"type":"way"}).count()
-183622
+35201
 ```
 
 #### # Number of distinct users
 ```sh
 > len(db.distinct('created.user'))
-2858
+396
 ```
 
 #### # Top Contributor
 ```sh
 > db.aggregate([{'$group': {'_id': '$created.user', 'count': {'$sum': 1}}},
 >               {'$sort': {'count': -1}}, {'$limit': 1}])
-{'count': 367906, '_id': 'nmixter'}
+{'_id': 'ediyes', 'count': 185571}
 ```
 
 #### # Number of contributors contributing more than 100 times
@@ -82,8 +81,92 @@ This section contains the basic statistics about the dataset and MongoDB queries
 > db.aggregate([{'$group': {'_id': '$created.user', 'count': {'$sum': 1}}},
 >               {'$match': {'count': {'$gte': 100}}},
 >               {'$group': {'_id': 'null', 'count': {'$sum': 1}}}])
-{'count': 416, '_id': 'null'}
+{'count': 36, '_id': 'null'}
 ```
+
+## 3. Additional ideas
+
+#### Suggestions for Data improvement
+
+Data represented in the file, does not looks complete anyway, it would need to fetch data from multiple sources, listed are the few ideas I can think which might help.
+* More users need to contribute to the data, to make it more interesting and increase user contribution, in the openstreetapp we can include some features like adding a review of a place, this could give motivation to that owner of the business to go and add some related data for the map.
+* Also we can make the app more interesting and add few cool features like expressing emotions about how people feel while they are stuck in traffic, a social connect while stuck in a traffic jam could direct some more traffic to the app.
+* We can go to the postal codes database and from the latitude longitude of and from the geospatial queries in MongoDB we can atleast add correct postal code for the given location.
+* We can also make use of Google API or geocoder.ca APIs for fetching data for the map, but this would have limitation as the API calls are free for a certain limit only after that those would need subscription.
+
+Parse the requested xml in the tree
+```python
+import xml.etree.ElementTree as ET
+import urllib.request
+
+tree = ET.fromstring(urllib.request.urlopen('http://geocoder.ca/37.7793173,-122.4508425?geoit=xml').read())
+```
+Resulting xml is
+
+```xml
+ <?xml version="1.0" encoding="UTF-8" ?>
+<result>
+    <geodata>
+       <latt>37.779099</latt>
+       <longt>-122.451448</longt>
+       <city>San Francisco</city>
+       <prov>CA</prov>
+       <postal>94118</postal>
+       <stnumber>2600</stnumber>
+       <staddress>TURK BLVD</staddress>
+       <inlatt>37.779317</inlatt>
+       <inlongt>-122.450842</inlongt>
+       <distance>0.059</distance><NearRoad>TURK BLVD</NearRoad>
+       <NearRoadDistance>0.046</NearRoadDistance>
+       <betweenRoad1>Roselyn</betweenRoad1>
+       <betweenRoad2>Kittredge</betweenRoad2>
+       <neighborhood>Anza Vista</neighborhood>
+       <confidence></confidence>
+       <intersection>
+           <street1>Turk St</street1>
+           <street2>Kittredge Ter</street2>
+           <lattx>37.778165</lattx>
+           <longtx>-122.450655</longtx>
+           <city>Western Addition</city>
+           <prov>CA</prov>
+           <distance>0.129</distance>
+       </intersection>
+       <major_intersection>
+           <street1>Turk Blvd</street1>
+           <street2>Roselyn Ter</street2>
+           <lattx>37.7782770000</lattx>
+           <longtx>-122.4497670000</longtx>
+           <city>San Francisco</city>
+           <prov>CA</prov>
+           <distance>0.149</distance>
+       </major_intersection>
+       <usa>
+           <latt>37.7790988000</latt>
+           <longt>-122.4514481000</longt>
+           <uscity>San Francisco</uscity>
+           <state>CA</state>
+           <zip>94118</zip>
+           <usstnumber>2600</usstnumber>
+           <usstaddress>TURK BLVD</usstaddress>
+           <inlatt>37.779317</inlatt>
+           <inlongt>-122.450842</inlongt>
+           <distance>0.059</distance>
+       </usa>
+    </geodata>
+</result>
+```
+
+fetch the address tags in geodata
+```python
+geodata = tree.getchildren()[0]
+```
+set the address fields in the json
+```python
+node['address']['city'] = geodata[2]
+node['address']['postcode'] = geodata[4]
+
+```
+Similarly add fields from the xml tags in the json, similar thing can be done using Google APIs as well.
 
 
 ### Additional Data exploration using MongoDB queries
@@ -94,36 +177,27 @@ This section contains the basic statistics about the dataset and MongoDB queries
 >               {'$group': {'_id': '$amenity', 'count': {'$sum': 1}}},
 >               {'$sort': {'count': -1}},
 >               {'$limit': 10}])
-{'count': 2286, '_id': 'parking'}
-{'count': 943, '_id': 'restaurant'}
-{'count': 861, '_id': 'school'}
-{'count': 620, '_id': 'place_of_worship'}
-{'count': 310, '_id': 'cafe'}
-{'count': 306, '_id': 'fast_food'}
-{'count': 293, '_id': 'bench'}
-{'count': 288, '_id': 'toilets'}
-{'count': 229, '_id': 'bicycle_parking'}
-{'count': 217, '_id': 'fuel'}
+{'_id': 'restaurant', 'count': 307}
+{'_id': 'parking', 'count': 124}
+{'_id': 'bicycle_parking', 'count': 119}
+{'_id': 'post_box', 'count': 108}
+{'_id': 'cafe', 'count': 104}
+{'_id': 'bench', 'count': 94}
+{'_id': 'place_of_worship', 'count': 84}
+{'_id': 'school', 'count': 73}
+{'_id': 'car_sharing', 'count': 65}
+{'_id': 'bar', 'count': 51}
 ```
 
-#### # Second biggest religion
-
-Jewish comes up as second biggest religion with 10 churches in the data and buddhist with 9 place of worships
+#### # Religion Numbers
 ```sh
 > db.aggregate([{'$match': {'amenity': {'$exists': 1}, 'amenity': 'place_of_worship'}},
 >               {'$group': {'_id': '$religion', 'count': {'$sum': 1}}},
 >               {'$sort': {'count': -1}},
 >               {'$limit': 10}])
-{'count': 559, '_id': 'christian'}
-{'count': 32, '_id': None}
-{'count': 10, '_id': 'jewish'}
-{'count': 9, '_id': 'buddhist'}
-{'count': 4, '_id': 'muslim'}
-{'count': 2, '_id': 'scientologist'}
-{'count': 1, '_id': 'sikh'}
-{'count': 1, '_id': 'eckankar'}
-{'count': 1, '_id': 'spiritualist'}
-{'count': 1, '_id': 'yogic'}
+{'_id': 'christian', 'count': 76}
+{'_id': 'buddhist', 'count': 3}
+{'_id': 'bahai', 'count': 1}
 ```
 
 #### # Popular Cuisines
@@ -133,16 +207,17 @@ Jewish comes up as second biggest religion with 10 churches in the data and budd
 >               {'$group': {'_id': '$cuisine', 'count': {'$sum': 1}}},
 >               {'$sort': {'count': -1}},
 >               {'$limit': 10}])
-{'count': 80, '_id': 'mexican'}
-{'count': 72, '_id': 'pizza'}
-{'count': 51, '_id': 'chinese'}
-{'count': 41, '_id': 'italian'}
-{'count': 37, '_id': 'american'}
-{'count': 35, '_id': 'japanese'}
-{'count': 30, '_id': 'thai'}
-{'count': 28, '_id': 'indian'}
-{'count': 27, '_id': 'burger'}
-{'count': 25, '_id': 'sandwich'}
+{'_id': 'mexican', 'count': 24}
+{'_id': 'american', 'count': 17}
+{'_id': 'japanese', 'count': 15}
+{'_id': 'thai', 'count': 14}
+{'_id': 'pizza', 'count': 14}
+{'_id': 'chinese', 'count': 10}
+{'_id': 'sushi', 'count': 9}
+{'_id': 'burger', 'count': 8}
+{'_id': 'indian', 'count': 7}
+{'_id': 'vietnamese', 'count': 6}
+
 ```
 #### # Postal Code with max number of restaurants
 ```sh
@@ -151,14 +226,11 @@ Jewish comes up as second biggest religion with 10 churches in the data and budd
 >               {'$group': {'_id': '$address.postcode', 'count': {'$sum': 1}}},
 >               {'$sort': {'count': -1}},
 >               {'$limit': 10}])
-{'count': 12, '_id': '94063'}
-{'count': 9, '_id': '94103'}
-{'count': 9, '_id': '94110'}
-{'count': 8, '_id': '94114'}
-{'count': 7, '_id': '94122'}
-{'count': 6, '_id': '94109'}
-{'count': 6, '_id': '94133'}
-{'count': 5, '_id': '94587'}
-{'count': 5, '_id': '94115'}
-{'count': 5, '_id': '94612'}
+{'_id': '94122', 'count': 49}
+{'_id': '94114', 'count': 32}
+{'_id': '94110', 'count': 23}
+{'_id': '94103', 'count': 18}
+{'_id': '94117', 'count': 14}
+{'_id': '94102', 'count': 10}
+{'_id': '94115', 'count': 3}
 ```
