@@ -1,0 +1,486 @@
+---
+title: "Project"
+author: "Abhinav"
+date: "April 9, 2016"
+output: html_document
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+library(memisc)
+theme_set(theme_minimal(20))
+```
+
+```{r echo=FALSE, LoadData}
+loanDataFull <- read.csv("/Users/abhiso/Work/learn/Udacity/DataAnalysisR/project/prosperLoanData.csv", sep = ",")
+
+```
+
+```{r echo=FALSE, Summary}
+dim(loanDataFull)
+```
+We have 81 variables specified in the data which is too large for the project.
+Here are the list of variables which should make much more sense for analysis of the loan data.
+
+* __Term__ - The length of the loan expressed in months.
+* __LoanStatus__ - The current status of the loan: Cancelled,  Chargedoff, Completed, Current, Defaulted, FinalPaymentInProgress, PastDue. The PastDue status will be accompanied by a delinquency bucket.
+* __ClosedDate__ - Closed date is applicable for Cancelled, Completed, Chargedoff and Defaulted loan statuses. 
+* __ListingCategory__ - The category of the listing that the borrower selected when posting their listing: 0 - Not Available, 1 - Debt Consolidation, 2 - Home Improvement, 3 - Business, 4 - Personal Loan, 5 - Student Use, 6 - Auto, 7- Other, 8 - Baby&Adoption, 9 - Boat, 10 - Cosmetic Procedure, 11 - Engagement Ring, 12 - Green Loans, 13 - Household Expenses, 14 - Large Purchases, 15 - Medical/Dental, 16 - Motorcycle, 17 - RV, 18 - Taxes, 19 - Vacation, 20 - Wedding Loans
+* __BorrowerState__ - The two letter abbreviation of the state of the address of the borrower at the time the Listing was created.
+* __Income Range__ - The income range of the borrower at the time the listing was created.
+* __IncomeVerifiable__ - The borrower indicated they have the required documentation to support their income.
+* __StatedMonthlyIncome__ - The monthly income the borrower stated at the time the listing was created.
+* __CreditScoreRangeLower__ - 	The lower value representing the range of the borrower's credit score as provided by a consumer credit rating agency.
+* __ProsperScore__ - A custom risk score built using historical Prosper data. The score ranges from 1-10, with 10 being the best, or lowest risk score.  Applicable for loans originated after July 2009.
+* __Occupation__ - The Occupation selected by the Borrower at the time they created the listing.
+* __EmploymentStatus__ - The employment status of the borrower at the time they posted the listing.
+* __EmploymentStatusDuration__ - The length in months of the employment status at the time the listing was created.
+* __CurrentCreditLines__ - Number of current credit lines at the time the credit profile was pulled.
+* __TotalCreditLinespast7years__ - Number of credit lines in the past seven years at the time the credit profile was pulled.
+* __DebtToIncomeRatio__ - The debt to income ratio of the borrower at the time the credit profile was pulled. This value is Null if the debt to income ratio is not available. This value is capped at 10.01 (any debt to income ratio larger than 1000% will be returned as 1001%).
+* __BorroweRate__ - The Borrower's interest rate for this loan.
+* __LoanOriginalAmount__ - The origination amount of the loan.
+* __LoanOriginationDate__ - The date the loan was originated.
+
+```{r, echo=FALSE, StripData}
+columns <- c("Term", "LoanStatus", "ClosedDate", "ListingCategory..numeric.", "BorrowerState", "Occupation", "IncomeRange", "IncomeVerifiable", "StatedMonthlyIncome", "CreditScoreRangeLower", "ProsperScore", "EmploymentStatus", "EmploymentStatusDuration", "CurrentCreditLines", "TotalCreditLinespast7years", "DebtToIncomeRatio", "BorrowerRate", "LoanOriginalAmount", "LoanOriginationDate")
+loanData <- loanDataFull[columns]
+```
+
+For the new stripped down data set, here are the details for it
+
+```{r, echo=FALSE, SummaryNewData}
+dim(loanData)
+names(loanData)
+str(loanData)
+
+levels(loanData$LoanStatus)
+levels(loanData$Occupation)
+levels(loanData$IncomeRange)
+levels(loanData$EmploymentStatus)
+
+summary(loanData)
+```
+# Summary
+
+* Median for Term is 36 months.
+* Of the 113937 observations, 5018 Loans have defaulted and 56576 are still going on.
+* Maximum loan observations are from California state.
+* Maximum people taking loan are int he income range of 25k - 50k
+* Of all the observations 8669 have not verified their income sources.
+* Mean monthly income is 5608
+* Mean Credit Score Lower range is 685.6
+* Mean Prosper score is 5.95
+* Median Employment Status Duration is 67 months
+
+```{r, echo=FALSE, Term}
+qplot(Term, data = loanData, binwidth=1)
+table(loanData$Term)
+```
+
+Maximum number of term are of 36 months with 87778 number of entries, there are few 12 month loans compared to 36 and 60 month loan, surprisingly people have not opted for 48 month loan either they are going 1,3 or 5 year of loan term.
+
+```{r, echo=FALSE, LoanStatus}
+qplot(LoanStatus, data = loanData)
+table(loanData$LoanStatus)
+```
+
+There are 11992 charged off and 5018 defaulted loan statuses that's around 16% of the loans has been defaulted or most probably to be defaulted, this seems a high number.
+
+```{r, echo=FALSE, ListingCategory}
+qplot(data = loanData, ListingCategory..numeric., binwidth=1)
+table(loanData$ListingCategory..numeric.)
+```
+
+More that half of the loans are in debt consolidation category, next higher count excluding Not Available and Other category are in Home Improvements and Business.
+
+```{r, echo=FALSE, ProsperScore}
+qplot(data = subset(loanData, !is.na(ProsperScore)), ProsperScore, binwidth = 1)
+table(loanData$ProsperScore)
+```
+
+From the looks of the histogram we can see that the result are showing up like a bell curve, where most of the data is around 4 - 8 while few having < 2 or > 10 scores.
+
+```{r, echo=FALSE, Occupation}
+qplot(data = loanData, Occupation)
+table(loanData$Occupation)
+```
+
+There are lot of proffesions given here, I have removed some of the outliers of Others and Professional entries but still seeiing that much that on x axis is unreadable, I can do a axis flip so that we can see the occupation on y axis in full text.
+
+```{r, echo=FALSE, subsetsOfOccupation}
+qplot(data = subset(loanData, !(loanData$Occupation %in% c("Other", "Professional"))), Occupation) + coord_flip()
+```
+
+There are maximum Computer Programmers
+
+```{r, echo=FALSE, CreditScoreRatings}
+qplot(data = loanData, CreditScoreRangeLower)
+```
+
+There are few outliers with 0 credit score, need to remove those
+
+```{r, echo=FALSE, RemovingOutliersCreditScoreRatings}
+qplot(data = subset(loanData, loanData$CreditScoreRangeLower > 450), CreditScoreRangeLower, binwidth = 50)
+table(loanData$CreditScoreRangeLower)
+```
+
+Maximum people are in range 650 - 750, it would be interesting to compare the defaulters to the credit score ratings, people with lower ratings must be have high defaulting or charged off loan status.
+
+
+```{r, echo=FALSE, MonthlyIncomeClean}
+qplot(data = subset(loanData, loanData$StatedMonthlyIncome < 10000), StatedMonthlyIncome)
+```
+
+To get an general idea of where the most of people lie in, need to increase the binwidth for that
+
+```{r, echo=FALSE, MonthlyIncomeDistribution}
+qplot(data = subset(loanData, loanData$StatedMonthlyIncome < 10000), StatedMonthlyIncome, binwidth = 1000)
+```
+
+Mostly people are in range 3000 - 6000, monthly income should have high correlation with the monthly income.
+
+```{r, echo=FALSE, YearOfClosedDate}
+require(lubridate)
+loanData$ClosedDateYear <- year(ymd_hms(loanData$ClosedDate))
+qplot(data = subset(loanData, !is.na(ClosedDateYear)), ClosedDateYear, binwidth = 1)
+```
+
+Highest number of loans are closed in the 2014 and from 2010 - 2013 it has remained constant.
+
+```{r, echo=FALSE, CreditLinesCleaned}
+qplot(data = subset(loanData, CurrentCreditLines < 30), CurrentCreditLines, binwidth = 0.5)
+table(loanData$CurrentCreditLines)
+```
+
+From the plot it seems that on an average people have around 7 - 12 credit lines, with some even having as far as 59 credit lines open.
+
+```{r, echo=FALSE, DebtToIncomeRatio}
+qplot(data = loanData, DebtToIncomeRatio)
+```
+
+Big outliers are in the plot, need to clean those, also need to set the binwidth to an lower amount to get better plot.
+
+```{r, echo=FALSE, DebtToIncomeRatioCleaned}
+qplot(data = subset(loanData, DebtToIncomeRatio <= 1.0), DebtToIncomeRatio, binwidth=0.01)
+```
+
+Debt to income ratio for majority lies aroung 0.25.
+
+
+# Univariate Analysis
+
+## What is/are the main feature(s) of interest in your dataset?
+The main feature in this dataset is the Loan Status, Prosper Score and Credit Score relations. I think that there has to be a direct corelation between the probability of some defaulting a loan is attached to the prosper and credit score for the loanee.
+
+## What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+Other features that might interest is the income range and the employment status, it is possible that someone with good credit score and good prosper score is unemployed for a while and his loan is going to be defaulted soon.
+
+## Did you create any new variables from existing variables in the dataset?
+Yes I added a closed data year, this might help me visualize in which year most of the loans were closed and then again subset data and see how many of these closed loans were defaulted, cancelled or chargedof, I predicting during the recession around 2008 - 2010 the ratio of completed loans might be less than later years.
+
+## Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+There were some outliers in credit score reange had to clean that up to get a good view of the income ranges. Then in viewing the occupations due to large number of entries needed to flip the axis to get a better view of the plot.
+In the Listing category plot my initial thought was auto loans or home loans might be the max number of loans listed, but from the plot the max number of loans were for debt consolidation which was quite surprising, I wen through some articles regarding this and people have stated that a debt consolidation loan is has higher probability than others to get defaulted, and still I see a very high number in that category.
+
+# Bivariate Plots Section
+
+First I want to compare credit scores with monthly income, and see if there is any correlation between them or not.
+
+```{r, echo=FALSE, IncomeVsCreditScore}
+qplot(data = loanData, x = CreditScoreRangeLower, y = StatedMonthlyIncome)
+```
+
+This data is not giving the correct picture due to various outliers here, probably I should consider monthly incomes less than 10000 and also remove data with 0 credit scores
+
+```{r, echo=FALSE, IncomeVsCreditScoreLessThan10000}
+qplot(data = subset(loanData, StatedMonthlyIncome < 12000 & StatedMonthlyIncome > 0 & CreditScoreRangeLower > 450), x = CreditScoreRangeLower, y = StatedMonthlyIncome, alpha = I(1/50)) + geom_smooth()
+```
+
+Too many points are there, to get a nice idea of the plot, need to add alpha bending to the plot to get a better view of the plot of where the area is more dense in the scatter plot.
+
+```{r, echo=FALSE, AlphaIncVsCreditScore}
+qplot(data = subset(loanData, StatedMonthlyIncome < 12000 & StatedMonthlyIncome > 0 & CreditScoreRangeLower > 450), x = CreditScoreRangeLower, y = StatedMonthlyIncome, alpha = I(1/50))
+```
+
+I can see some relation between which seems linear, adding a smooth line can sugest better where the plot is moving towards
+
+```{r, echo=FALSE, AlphaIncVsCreditScoreSmooth}
+qplot(data = subset(loanData, StatedMonthlyIncome < 12000 & StatedMonthlyIncome > 0 & CreditScoreRangeLower > 450), x = CreditScoreRangeLower, y = StatedMonthlyIncome, alpha = I(1/50)) + geom_smooth()
+loanDataIncome <- subset(loanData, StatedMonthlyIncome < 12000 & StatedMonthlyIncome > 0 & CreditScoreRangeLower > 450)
+corIncomeVsScore <- cor(loanDataIncome$StatedMonthlyIncome, loanDataIncome$CreditScoreRangeLower)
+```
+
+Now we can see a clear smooth line moving in a linear direction, also the corelation between them is positive 0.22, this seems to me a low score, logically these 2 scores should have much higher correlations.
+
+Next we can compare Prosper Score with the Credit Score. 
+
+```{r, echo=FALSE, ProsperVsCredit}
+qplot(data = subset(loanData, !is.na(ProsperScore)), x = ProsperScore, y = CreditScoreRangeLower, alpha = I (1/20)) + geom_smooth()
+loanDataProsperCredit <- subset(loanData, !is.na(ProsperScore) & CreditScoreRangeLower > 450)
+corProsperVsCredit <- cor(loanDataProsperCredit$CreditScoreRangeLower, loanDataProsperCredit$ProsperScore)
+```
+
+Plot shows similar characteristics as shown in comparison in CreditScore vs Monthly Income, where many points are there and on smoothning the data only we can see a mostly linear relation between the two variables, but in the end even people with higher credit scores were having lower prosper scores. Correlation is 0.37 between these 2
+
+Now I want to compare the Loan Status with the Credit Score, I woul dmake the binwidth as 20 to group some of the credit scores together to get a better view of the bar graph, also removing data with LoanStatus as Current
+
+```{r, echo=FALSE, LoanStatusVsCreditScore}
+qplot(CreditScoreRangeLower, data = subset(loanData, CreditScoreRangeLower > 450), binwidth = 20, fill = LoanStatus) +
+  guides(fill = guide_legend(reverse = T))
+with(loanData, by(CreditScoreRangeLower, LoanStatus, summary))
+```
+
+In lower credit scores there are more ChargedOff and Defaulted loans compared to current and completed. In higher scores we can see the ratio of completed and current loans higher.
+
+```{r, echo=FALSE, LoanStatusVsCreditScoreNoCurrent}
+qplot(CreditScoreRangeLower, data = subset(loanData, CreditScoreRangeLower > 450 & !(loanData$LoanStatus %in% c("Current")) & !is.na(ClosedDateYear)), binwidth = 20, fill = LoanStatus) +
+  guides(fill = guide_legend(reverse = T))
+```
+
+I am comparing LoanStatus with the year and see is their any relation between them or not, I am looking for does the recession after 2008 added the jumps in number of defaulted or charged off loans.
+
+```{r, echo=FALSE, YearVsLoanStatus}
+qplot(ClosedDateYear, data = subset(loanData, !is.na(ClosedDateYear)), fill = LoanStatus, binwidth = 1) + guides(fill = guide_legend(reverse = T))
+```
+
+We can see number of defaulted and chargedoff suddenly rose after 2007 and it went on till 2010 after that the ratio is not that much.
+
+I will compare states and Loan Status and see if there is some relation we can find here.
+
+```{r, echo=FALSE, LoanStatuVsState}
+qplot(BorrowerState, data = subset(loanData, !is.na(ClosedDateYear)), fill = LoanStatus) + guides(fill = guide_legend(reverse = T)) + coord_flip()
+```
+
+The distribution seems normal here, ratio for each state seems to be the same here.
+
+I will now compare Listing category with the Loan Status.
+
+```{r, echo=FALSE, LoanStatusVsListingCategory}
+qplot(ListingCategory..numeric., data = subset(loanData, !is.na(ClosedDateYear)), fill = LoanStatus, binwidth = 1) + guides(fill = guide_legend(reverse = T))
+```
+
+A lot of people are in debt consolidation, and also we have higher number of defaulted, charged off in debt consolidation and unknown category, but I could not find any much different because the ratio is almost the same.
+
+Next I want to comapre correlation between credit score and number of credit lines.
+
+```{r, echo=FALSE, CreditScoreVsCreditLines}
+qplot(y = CurrentCreditLines, x = CreditScoreRangeLower, data = subset(loanData, CreditScoreRangeLower > 450 & !is.na(CurrentCreditLines)), alpha = I(1/400)) + geom_smooth()
+by(loanData$CurrentCreditLines, loanData$CreditScoreRangeLower, summary)
+```
+
+People with higher credit lines tend to stay mostly around 700 range and usually people with higher credit score something like greater than 750 tend to have fewer credit lines.
+
+I should also take a look into comparison of DebtToIncomeRatio and LoanStatus.
+
+```{r, echo=FALSE, DebtToIncomeRatioVsLoanStatus}
+qplot(DebtToIncomeRatio, data = subset(loanData, DebtToIncomeRatio <= 1.0 & !(loanData$LoanStatus %in% c("Current")) & !is.na(ClosedDateYear)), fill = LoanStatus, binwidth = 0.01) + guides(fill = guide_legend(reverse = T))
+
+qplot(DebtToIncomeRatio, data = subset(loanData, DebtToIncomeRatio <= 1.0 & !(loanData$LoanStatus %in% c("Current")) & !is.na(ClosedDateYear)), fill = LoanStatus, binwidth = 0.01) + facet_wrap(~LoanStatus)
+```
+
+If I create the plot into one graph, there is nothing I can deduce from it, so I did a facet wrap to see how the curve changes in each individual category. So here if we compare defaulted to the completed cureves, completed one moves steep while going to 0.20 range and then comes down steeply but if you see in defaulted or even charged off plots the curve is not that steep, that means people with lower debt tend to default or have their loans charged off.
+
+Comparing Employment Status and Loan Status.
+
+```{r, echo=FALSE, EmploymentStatusVsLoanStatus}
+qplot(EmploymentStatus, data = subset(loanData, !is.na(ClosedDateYear)), fill = LoanStatus) + guides(fill = guide_legend(reverse = T)) + coord_flip() + facet_wrap(~LoanStatus)
+```
+
+In this case it seems that for Employed and Full time employment status people had mostly charged off their loan amounts instead of defaulted.
+
+Next I want to see the status of loans started in a certain year, for this I would need to create LoanYear variable that would give us the year when the loan started.
+
+```{r, echo=FALSE, LoanYearVsLoanStatus}
+loanData$LoanYear <- year(ymd_hms(loanData$LoanOriginationDate))
+qplot(LoanYear, data = subset(loanData, !is.na(ClosedDateYear) & LoanYear > 2005), fill = LoanStatus, binwidth=1) + guides(fill = guide_legend(reverse = T))
+```
+
+We can see that maximum number of loans defaulted and charged off are from 2006 - 2008 while it has decreased by lot in after years, also in 2009 there is a major drop in loans initiated this might be due to the recovering economy from the recession.
+
+Next I want to compare the relation between Credit Lines and Monthly Debt and analyse there correlation.
+For monthly debt I would need to multiple debt to income ratio to the monthly income variable
+
+```{r, echo=FALSE, MonthlyDebt}
+loanData$MonthlyDebt <- loanData$StatedMonthlyIncome * loanData$DebtToIncomeRatio
+qplot(x = CurrentCreditLines, y = MonthlyDebt, data = loanData)
+```
+
+Need to clear some outliers where monthly debt is way higher, let smake it lesser than 8000 as most of the observations are within that range, and also moving credit lines less than 40
+
+```{r, echo=FALSE, MonthlyDebtNoOutliers}
+qplot(x = CurrentCreditLines, y = MonthlyDebt, data = subset(loanData, MonthlyDebt < 8000 & CurrentCreditLines < 40), alpha = I(1/20))
+
+loanDataSub <- subset(loanData, MonthlyDebt < 8000 & CurrentCreditLines < 40)
+corMonthlyDebtToCreditLines <- cor(loanDataSub$CurrentCreditLines, loanDataSub$MonthlyDebt)
+```
+
+There is a high correlation between these 2 variables, correlation is around 0.595595, so generally people with higher debt tends to have higher number of credil lines open.
+
+```{r, echo=FALSE, RateVsCreditScore}
+qplot(x = CreditScoreRangeLower, y = BorrowerRate, data = subset(loanData, CreditScoreRangeLower > 450), alpha = I(1/50)) + geom_smooth()
+loanDataScore <- subset(loanData, CreditScoreRangeLower > 450)
+corCreditScoreToBorroweRate <- cor(loanDataScore$CreditScoreRangeLower, loanDataScore$BorrowerRate)
+```
+
+The correlation between Borrower Rate and Credit Score is negative -0.488 which seems logical as people with higher credit score get lesser loan rates.
+
+```{r, echo=FALSE, RateVsLoanAmount}
+qplot(y = BorrowerRate, x = LoanOriginalAmount, data = loanData, alpha = I(1/50))
+corRateVsAmount <- cor(loanData$BorrowerRate, loanData$LoanOriginalAmount)
+```
+
+Negative correlation of -0.33 which seems opposite of what I thought, larger amounts should be having higher rates due to higher risk involved in that.
+
+```{r, echo=FALSE, CreditScoreVsRate}
+qplot(y = LoanOriginalAmount, x = CreditScoreRangeLower, data = loanDataScore, alpha = I(1/100))
+corAmountVsScore = cor(loanDataScore$CreditScoreRangeLower, loanDataScore$LoanOriginalAmount)
+```
+
+Positive correlation between Credit Score and Loan Amount of 0.35, people with higher credit scores took higher loans.
+
+```{r, echo=FALSE, RateVsLoanStatus}
+qplot(BorrowerRate, data = subset(loanData, BorrowerRate < 0.36), fill = LoanStatus, binwidth = 0.005) + guides(fill = guide_legend(reverse = T))
+```
+
+Lots of loan given at 0.325 interest rate compared to others around.
+
+```{r, echo=FALSE, AmountVsYear}
+ggplot(loanData, aes(LoanYear, LoanOriginalAmount)) +
+  geom_boxplot(aes(group = LoanYear))
+```
+
+Loan amounts decreased in year 2009 and after that it has been increasing and its comapratively way higher in 2013 and 2014 than other years.
+
+```{r, echo=FALSE, AmountVsIncomeRange}
+ggplot(loanData, aes(IncomeRange, LoanOriginalAmount)) +
+  geom_boxplot(aes(group = IncomeRange)) +
+  coord_flip()
+```
+
+Higher income group took out higher loan amounts, which seems intuitive.
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+* Strong positive correlation between Monthly Debt and Credit Lines opened for an individual.
+* Positive correlation between monthly income and credit score which is logical.
+* Positive correlation between prosper score and credit score.
+* More number of defaulted or charged off loans in lower credit scores.
+* High number of people defaulted in 2008 - 2010 and these were the loans taken from 2006 - 2008.
+* Negative correlation between borrower rate and credit score, which is logical.
+* Negative correlation between borrower rate and loan amount.
+* Positive correlation between Loan amount and Credit Score.
+* Higher income group took higher loan amounts.
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
+* Loan amounts decreased in 2009 and has been going up since then, people are taking higher loans in 2013 and 2014 than before, this dip in 2009 must be due to the recession in 2006 - 2008.
+* Another interesting thing came up is the relation between Prosper Score and Credit Score, these two should have a high correlation but it was only 0.22 which seems very low.
+
+### What was the strongest relationship you found?
+Strongest relationship was between Monthly Debt to number of Current Credit Lines for an individual.
+
+# Multivariate Plots Section
+
+```{r, echo=FALSE, LoanAmountRateAndCreditScore}
+ggplot(aes(x = LoanOriginalAmount, y = BorrowerRate), data = subset(loanDataScore, CreditScoreRangeLower > 680)) + 
+  geom_point(aes(color = factor(CreditScoreRangeLower)), alpha = 0.2, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Credit Score', reverse = F,
+                                          override.aes = list(alpha = 1, size = 2)))
+
+```
+
+Higher Credit Scores, higher loan amount is given and lower borrower rate is also given, for better visualization need to strip down data for credit scores greater than 680 only.
+
+```{r, echo=FALSE, MonthlyDebtCreditLineCreditScore}
+ggplot(data = subset(loanData, !(loanData$IncomeRange %in% c("$0"))), aes(LoanYear, LoanOriginalAmount)) +
+  geom_boxplot(aes(group = LoanYear, color = IncomeRange)) +
+  facet_wrap(~IncomeRange)
+```
+
+In $100,000+, $25k-50k, $50k-75k and $75k-99k we can see definite increase in loan amounts, but we see drop in loan amounts for not employed persons and no increase for later years for $1-24k section.
+
+```{r, echo=FALSE, DebtToIncomeMulti}
+ggplot(aes(x = ProsperScore, y = DebtToIncomeRatio), data = subset(loanDataScore, !is.na(ProsperScore) & CreditScoreRangeLower < 820 & DebtToIncomeRatio < 0.75)) + 
+  geom_point(aes(color = factor(CreditScoreRangeLower)), alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Credit Score', reverse = F,
+                                          override.aes = list(alpha = 1, size = 2)))
+
+```
+
+People with higher debt to income ratio and higher credit scores have lesser prosper score, and people with higher credit scores but lesser debt to income ratio have higher prosper score, this explains the low correlation of prosper and credit scores.
+
+```{r, echo=FALSE, MonthlyDebtToCreditLinesWithCreditScore}
+ggplot(aes(x = CurrentCreditLines, y = MonthlyDebt), data = subset(loanData, MonthlyDebt < 8000 & CurrentCreditLines < 40 & CreditScoreRangeLower < 820 & CreditScoreRangeLower > 600)) + 
+  geom_point(aes(color = factor(CreditScoreRangeLower)), alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Credit Score', reverse = F,
+                                          override.aes = list(alpha = 1, size = 2)))
+
+```
+Monthly debt and current credit lines do have high correlation and after adding credit score ranges as well people with lower credit scores have lower monthly debt and as we move above in the plot we can see mixed results, but people with higher credit scores and more credit lines do have higher monthly debt as well.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+Looking at the loan amounts and borrower rates, people with higher credit scores were definitely given lower interest rates even with higher loan amounts, also another relation came up with higher the income higher the loan amount is.
+
+### Were there any interesting or surprising interactions between features?
+Looking more into the low correlation between prosper score and credit score, I added debt to income ratio in this plot, this explained a lot of relation between these 2 variables, higher debt to income makes prosper score lower even for people with higher credit score.
+
+# Final Plots and Summary
+
+### Plot One
+```{r, echo=FALSE, YearVsLoanStatus1}
+ggplot(aes(x = LoanOriginalAmount, y = BorrowerRate),
+       data = subset(loanDataScore, CreditScoreRangeLower > 680)) + 
+  facet_wrap(~LoanYear) +
+  geom_point(aes(color = factor(CreditScoreRangeLower)), alpha = 0.2, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Credit Score', reverse = F,
+                                          override.aes = list(alpha = 1, size = 2)))
+
+```
+
+### Description One
+Year by year there have been changes in 2006 most of the people were given low rates, then in 2007 a bit of rates increased, then in 2009 people were taking lower loan amounts but still getting higher rates and same goes in 2010 lower loan amounts and still higher rates, then again rates started goin lower after 2011 and also the loan amounts started increasing after that in 2011, 2012 and 2013 and in 2014 we can see that rates have dropeed  and amounts have increased quite a lot.
+Before 2014 we can also see clear demarcation between rates given to people with higher credit score but that demarcation has vanished in 2014.
+
+### Plot Two
+
+```{r, echo=FALSE, AmountVsIncomeRange1}
+ggplot(data = subset(loanData, DebtToIncomeRatio < 1.0), aes(DebtToIncomeRatio, LoanOriginalAmount)) +
+  geom_point(aes(color = factor(IncomeRange)), alpha = 0.5, size = 1, position = 'jitter') +
+  facet_wrap(~LoanYear) +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Income Range', reverse = F,
+                                          override.aes = list(alpha = 1, size = 2)))
+```
+
+### Description Two
+Loan Amounts have increased in 2013 and 2014 but still the debt to income ratio is much lower, while if we look in year 2007 and 2008 we can see many people are having worse debt to income ratio nearer to 1, in 2009 and 2010 most people maintained good debt to income ratio for their loans it again gets worse in 2011 and 2012.
+One more thing I can deduce people in low income range $1-24999 have poor debt to income ratio, also as we go up in income range we can see higher loan amounts as well.
+
+### Plot Three
+```{r, echo=FALSE, DebtToIncomeMulti1}
+ggplot(aes(x = ProsperScore, y = DebtToIncomeRatio), data = subset(loanDataScore, !is.na(ProsperScore) & CreditScoreRangeLower < 820 & DebtToIncomeRatio < 1.0)) + 
+  geom_point(aes(color = factor(CreditScoreRangeLower)), alpha = 0.1, size = 1, position = 'jitter') +
+  facet_wrap(~IncomeRange) +
+  scale_color_brewer(type = 'div',
+                     guide = guide_legend(title = 'Credit Score', reverse = F,
+                                          override.aes = list(alpha = 1, size = 2)))
+
+```
+
+### Description Three
+People in income ranges $1-24,999 and $25-49,999 have higher debt to income ratio and so they have mostly lower prosper score while in income ranges above 50k we can see more cluster is getting darker towards the right of the plot and also people are having lower debt to income ratio as well.
+
+### Reflection
+The Loan data set had 114000 loan observation for years 2006 to 2014 with 81 variables, for this problem set I chose 22 variables for analysis. The difficulties I had at first was choosing correct and smaller dataset for my work, wanted to maintain a smaller dataset so I went in with 15 variables at first then while going through some of the analysis I wen through more variables and found that they might be providing better analysis or have better correlation with some of the oher variables in the set. I would have like to model around the data but I think I would need to take the next courses for that to implement.
+In the data through multiple plots I could see the company was struggling with loans, and the situation was worse during the recession years where they were probably to lenient in giving out loans to people even though people were having bad debt to income ratio, but I think they have recovered from that since 2012 where I can see they have applied some strictness and giving good loans only.
